@@ -37,7 +37,9 @@ jobs:
       run: go mod download
 
     - name: Test examples
-      run: go run ./examples/chat
+      run: |
+        go run ./examples/chat
+        go run ./examples/stream
       shell: bash
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
