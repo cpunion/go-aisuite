@@ -30,12 +30,13 @@ func (c *Client) ChatCompletion(ctx context.Context, req aisuite.ChatCompletionR
 			Content: msg.Content,
 		}
 	}
-	resp, err := c.client.CreateChatCompletion(ctx, ai.ChatCompletionRequest{
+	chatReq := ai.ChatCompletionRequest{
 		Model:     req.Model,
 		MaxTokens: req.MaxTokens,
 		Stream:    req.Stream,
 		Messages:  aiMessages,
-	})
+	}
+	resp, err := c.client.CreateChatCompletion(ctx, chatReq)
 	if err != nil {
 		return nil, err
 	}
@@ -105,10 +106,13 @@ func (c *Client) StreamChatCompletion(ctx context.Context, req aisuite.ChatCompl
 			Content: msg.Content,
 		}
 	}
-	s, err := c.client.CreateChatCompletionStream(ctx, ai.ChatCompletionRequest{
-		Model:    req.Model,
-		Messages: aiMessages,
-	})
+	chatReq := ai.ChatCompletionRequest{
+		Model:     req.Model,
+		Messages:  aiMessages,
+		MaxTokens: req.MaxTokens,
+		Stream:    true,
+	}
+	s, err := c.client.CreateChatCompletionStream(ctx, chatReq)
 	if err != nil {
 		return nil, err
 	}
