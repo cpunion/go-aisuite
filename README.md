@@ -17,7 +17,7 @@ A cross-platform Go library for interacting with multiple AI providers' APIs, in
 - Unified interface for multiple AI providers
 - Currently supports:
   - OpenAI (via [go-openai](https://github.com/sashabaranov/go-openai))
-  - Anthropic (via [go-anthropic](https://github.com/liushuangls/go-anthropic))
+  - Anthropic (via [official SDK](https://github.com/anthropics/anthropic-sdk-go))
 - Carefully designed API that follows each provider's best practices
 - Gradual and thoughtful addition of necessary interfaces and fields
 
@@ -31,7 +31,7 @@ go get github.com/cpunion/go-aisuite
 
 See complete examples in the [examples](./examples) directory.
 
-Basic usage:
+### Chat
 
 <!-- embedme examples/chat/main.go -->
 
@@ -60,7 +60,7 @@ func main() {
 		Model: "openai:gpt-4o-mini", // or "anthropic:claude-3-5-haiku-20241022"
 		Messages: []aisuite.ChatCompletionMessage{
 			{
-				Role:    aisuite.User,
+				Role:    aisuite.RoleUser,
 				Content: "Hello, how are you?",
 			},
 		},
@@ -71,6 +71,64 @@ func main() {
 	}
 
 	fmt.Printf("Response: %s\n", resp.Choices[0].Message.Content)
+}
+
+```
+
+### Stream
+
+<!-- embedme examples/stream/main.go -->
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/cpunion/go-aisuite"
+	"github.com/cpunion/go-aisuite/client"
+)
+
+func main() {
+	// Initialize client with API keys
+	c := client.New(&client.APIKey{
+		OpenAI:    "", // Set your OpenAI API key or use OPENAI_API_KEY env
+		Anthropic: "", // Set your Anthropic API key or use ANTHROPIC_API_KEY env
+	})
+
+	// Create a streaming chat completion request
+	stream, err := c.StreamChatCompletion(context.Background(), aisuite.ChatCompletionRequest{
+		Model: "openai:gpt-4o-mini", // or "anthropic:claude-3-5-haiku-20241022"
+		Messages: []aisuite.ChatCompletionMessage{
+			{
+				Role:    aisuite.RoleUser,
+				Content: "Hello, how are you?",
+			},
+		},
+		MaxTokens: 10,
+	})
+	if err != nil {
+		panic(err)
+	}
+	defer stream.Close()
+
+	// Read the response stream
+	for {
+		resp, err := stream.Recv()
+		if err != nil {
+			panic(err)
+		}
+		if len(resp.Choices) == 0 {
+			fmt.Println("No choices")
+			break
+		}
+		if resp.Choices[0].FinishReason != "" {
+			fmt.Printf("\nStream finished: %s\n", resp.Choices[0].FinishReason)
+			break
+		}
+		fmt.Print(resp.Choices[0].Delta.Content)
+	}
 }
 
 ```
@@ -87,4 +145,4 @@ MIT License
 
 This project is inspired by [aisuite](https://github.com/andrewyng/aisuite) and builds upon the excellent work of:
 - [go-openai](https://github.com/sashabaranov/go-openai)
-- [go-anthropic](https://github.com/liushuangls/go-anthropic)
+- [anthropic-sdk-go](https://github.com/anthropics/anthropic-sdk-go)

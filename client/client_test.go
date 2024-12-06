@@ -2,84 +2,149 @@ package client
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/cpunion/go-aisuite"
 )
 
+var testModels = []string{
+	"openai:gpt-4o-mini",
+	"anthropic:claude-3-5-haiku-20241022",
+}
+
+type testCase struct {
+	name             string
+	model            string
+	prompt           string
+	maxTokens        int
+	wantFinishReason aisuite.FinishReason
+}
+
+func generateTestCases() []testCase {
+	var cases []testCase
+
+	// Test cases for max_tokens finish reason
+	longStory := "Tell me a very long story about a magical adventure with dragons, wizards, and epic battles."
+	for _, model := range testModels {
+		cases = append(cases, testCase{
+			name:             fmt.Sprintf("%s_maxtoken_test", strings.Split(model, ":")[1]),
+			model:            model,
+			prompt:           longStory,
+			maxTokens:        5,
+			wantFinishReason: aisuite.FinishReasonMaxTokens,
+		})
+	}
+
+	// Test cases for normal stop
+	for _, model := range testModels {
+		cases = append(cases, testCase{
+			name:             fmt.Sprintf("%s_normal_stop", strings.Split(model, ":")[1]),
+			model:            model,
+			prompt:           "Hi",
+			maxTokens:        20,
+			wantFinishReason: aisuite.FinishReasonStop,
+		})
+	}
+
+	return cases
+}
+
+func withTimeout(t *testing.T, timeout time.Duration, fn func(ctx context.Context)) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		fn(ctx)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return
+	case <-ctx.Done():
+		t.Fatal("test timeout")
+	}
+}
+
 func TestChatCompletion(t *testing.T) {
 	client := New(nil)
-	models := []string{
-		"openai:gpt-4o-mini",
-		"anthropic:claude-3-5-haiku-20241022",
-	}
+	models := testModels
 	for _, model := range models {
-		resp, err := client.ChatCompletion(context.Background(), aisuite.ChatCompletionRequest{
-			Model: model,
-			Messages: []aisuite.ChatCompletionMessage{
-				{
-					Role:    aisuite.User,
-					Content: "Hello",
-				},
-			},
-			MaxTokens: 10,
+		t.Run(model, func(t *testing.T) {
+			withTimeout(t, 10*time.Second, func(ctx context.Context) {
+				resp, err := client.ChatCompletion(ctx, aisuite.ChatCompletionRequest{
+					Model: model,
+					Messages: []aisuite.ChatCompletionMessage{
+						{
+							Role:    aisuite.RoleUser,
+							Content: "Hi",
+						},
+					},
+					MaxTokens: 30,
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(resp.Choices) == 0 {
+					t.Fatal("no choices")
+				}
+				fmt.Printf("Response: %s\n", resp.Choices[0].Message.Content)
+			})
 		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Logf("resp: %#v", resp)
 	}
 }
 
 func TestStreamChatCompletion(t *testing.T) {
 	client := New(nil)
-	models := []string{
-		"openai:gpt-4o-mini",
-		"anthropic:claude-3-5-haiku-20241022",
-	}
-	for _, model := range models {
-		t.Run(model, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
+	cases := generateTestCases()
 
-			stream, err := client.StreamChatCompletion(ctx, aisuite.ChatCompletionRequest{
-				Model: model,
-				Messages: []aisuite.ChatCompletionMessage{
-					{
-						Role:    aisuite.User,
-						Content: "Hello",
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			withTimeout(t, 10*time.Second, func(ctx context.Context) {
+				stream, err := client.StreamChatCompletion(ctx, aisuite.ChatCompletionRequest{
+					Model: tc.model,
+					Messages: []aisuite.ChatCompletionMessage{
+						{
+							Role:    aisuite.RoleUser,
+							Content: tc.prompt,
+						},
 					},
-				},
-				MaxTokens: 10,
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer stream.Close()
+					MaxTokens: tc.maxTokens,
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer stream.Close()
 
-			// Read all chunks from the stream
-			for {
-				select {
-				case <-ctx.Done():
-					t.Fatal("context deadline exceeded")
-					return
-				default:
-					chunk, err := stream.Recv()
+				var content string
+				var finishReason aisuite.FinishReason
+				for {
+					resp, err := stream.Recv()
 					if err != nil {
-						if err.Error() == "EOF" {
-							return
-						}
 						t.Fatal(err)
 					}
-
-					t.Logf("chunk: %#v", chunk)
-					if len(chunk.Choices) > 0 && chunk.Choices[0].FinishReason != "" {
-						t.Logf("finish reason: %s", chunk.Choices[0].FinishReason)
-						return
+					if len(resp.Choices) == 0 {
+						fmt.Println("No choices")
+						break
 					}
+					if resp.Choices[0].FinishReason != "" {
+						finishReason = resp.Choices[0].FinishReason
+						break
+					}
+					content += resp.Choices[0].Delta.Content
 				}
-			}
+
+				if finishReason != tc.wantFinishReason {
+					t.Errorf("got finish reason %q, want %q", finishReason, tc.wantFinishReason)
+				}
+
+				fmt.Printf("Test case %s:\nPrompt: %s\nResponse: %s\nFinish reason: %s\n\n",
+					tc.name, tc.prompt, content, finishReason)
+			})
 		})
 	}
 }
