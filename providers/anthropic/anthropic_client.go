@@ -4,8 +4,10 @@ import (
 	"context"
 	"os"
 
+	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/option"
+	"github.com/anthropics/anthropic-sdk-go/packages/ssestream"
 	"github.com/cpunion/go-aisuite"
-	anthropicapi "github.com/liushuangls/go-anthropic/v2"
 )
 
 const (
@@ -13,7 +15,7 @@ const (
 )
 
 type Client struct {
-	client *anthropicapi.Client
+	client *anthropic.Client
 }
 
 func NewClient(token string) *Client {
@@ -23,41 +25,34 @@ func NewClient(token string) *Client {
 			panic("ANTHROPIC_API_KEY not found in environment variables")
 		}
 	}
-	return &Client{client: anthropicapi.NewClient(token)}
+	return &Client{client: anthropic.NewClient(option.WithAPIKey(token))}
 }
 
 func (c *Client) ChatCompletion(ctx context.Context, req aisuite.ChatCompletionRequest) (*aisuite.ChatCompletionResponse, error) {
-	messages := make([]anthropicapi.Message, len(req.Messages))
+	messages := make([]anthropic.MessageParam, len(req.Messages))
 	for i, msg := range req.Messages {
-		var content []anthropicapi.MessageContent
 		if msg.Content != "" {
-			content = []anthropicapi.MessageContent{
-				anthropicapi.NewTextMessageContent(msg.Content),
-			}
-		}
-		messages[i] = anthropicapi.Message{
-			Role:    anthropicapi.ChatRole(msg.Role),
-			Content: content,
+			messages[i] = anthropic.NewUserMessage(anthropic.NewTextBlock(msg.Content))
 		}
 	}
 
-	request := anthropicapi.MessagesRequest{
-		Model:     anthropicapi.Model(req.Model),
-		Messages:  messages,
-		MaxTokens: req.MaxTokens,
-	}
-	if request.MaxTokens == 0 {
-		request.MaxTokens = defaultMaxTokens
+	maxTokens := int64(req.MaxTokens)
+	if maxTokens == 0 {
+		maxTokens = defaultMaxTokens
 	}
 
-	resp, err := c.client.CreateMessages(ctx, request)
+	resp, err := c.client.Messages.New(ctx, anthropic.MessageNewParams{
+		Model:     anthropic.F(anthropic.Model(req.Model)),
+		Messages:  anthropic.F(messages),
+		MaxTokens: anthropic.F(maxTokens),
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	content := ""
 	if len(resp.Content) > 0 {
-		content = resp.Content[0].GetText()
+		content = resp.Content[0].Text
 	}
 
 	return &aisuite.ChatCompletionResponse{
@@ -72,68 +67,73 @@ func (c *Client) ChatCompletion(ctx context.Context, req aisuite.ChatCompletionR
 	}, nil
 }
 
+func (c *Client) StreamChatCompletion(ctx context.Context, req aisuite.ChatCompletionRequest) (aisuite.ChatCompletionStream, error) {
+	messages := make([]anthropic.MessageParam, len(req.Messages))
+	for i, msg := range req.Messages {
+		if msg.Content != "" {
+			messages[i] = anthropic.NewUserMessage(anthropic.NewTextBlock(msg.Content))
+		}
+	}
+
+	maxTokens := int64(req.MaxTokens)
+	if maxTokens == 0 {
+		maxTokens = defaultMaxTokens
+	}
+
+	stream := c.client.Messages.NewStreaming(ctx, anthropic.MessageNewParams{
+		Model:     anthropic.F(anthropic.Model(req.Model)),
+		Messages:  anthropic.F(messages),
+		MaxTokens: anthropic.F(maxTokens),
+	})
+
+	return &chatCompletionStream{
+		stream: stream,
+	}, nil
+}
+
 type chatCompletionStream struct {
-	ctx    context.Context
-	client *anthropicapi.Client
-	req    anthropicapi.MessagesStreamRequest
+	stream *ssestream.Stream[anthropic.MessageStreamEvent]
 }
 
 func (s *chatCompletionStream) Recv() (aisuite.ChatCompletionStreamResponse, error) {
-	resp, err := s.client.CreateMessagesStream(s.ctx, s.req)
-	if err != nil {
-		return aisuite.ChatCompletionStreamResponse{}, err
-	}
+	for {
+		if !s.stream.Next() {
+			continue
+		}
+		if err := s.stream.Err(); err != nil {
+			return aisuite.ChatCompletionStreamResponse{}, err
+		}
 
-	// Extract content from the response
-	content := ""
-	if len(resp.Content) > 0 {
-		content = resp.Content[0].GetText()
-	}
+		event := s.stream.Current()
 
-	return aisuite.ChatCompletionStreamResponse{
-		Choices: []aisuite.ChatCompletionStreamChoice{
-			{
-				Delta: aisuite.ChatCompletionStreamChoiceDelta{
-					Role:    string(resp.Role),
-					Content: content,
+		switch event.Type {
+		case anthropic.MessageStreamEventTypeMessageDelta:
+			event := event.Delta.(anthropic.MessageDeltaEventDelta)
+			if event.StopReason != "" {
+				return aisuite.ChatCompletionStreamResponse{
+					Choices: []aisuite.ChatCompletionStreamChoice{
+						{
+							FinishReason: string(event.StopReason),
+						},
+					},
+				}, nil
+			}
+		case anthropic.MessageStreamEventTypeContentBlockDelta:
+			delta := event.Delta.(anthropic.ContentBlockDeltaEventDelta)
+			return aisuite.ChatCompletionStreamResponse{
+				Choices: []aisuite.ChatCompletionStreamChoice{
+					{
+						Delta: aisuite.ChatCompletionStreamChoiceDelta{
+							Role:    "assistant",
+							Content: delta.Text,
+						},
+					},
 				},
-				FinishReason: string(resp.StopReason),
-			},
-		},
-	}, nil
+			}, nil
+		}
+	}
 }
 
 func (s *chatCompletionStream) Close() error {
-	return nil
-}
-
-func (c *Client) StreamChatCompletion(ctx context.Context, req aisuite.ChatCompletionRequest) (aisuite.ChatCompletionStream, error) {
-	messages := make([]anthropicapi.Message, len(req.Messages))
-	for i, msg := range req.Messages {
-		var content []anthropicapi.MessageContent
-		if msg.Content != "" {
-			content = []anthropicapi.MessageContent{
-				anthropicapi.NewTextMessageContent(msg.Content),
-			}
-		}
-		messages[i] = anthropicapi.Message{
-			Role:    anthropicapi.ChatRole(msg.Role),
-			Content: content,
-		}
-	}
-
-	streamReq := anthropicapi.MessagesStreamRequest{
-		MessagesRequest: anthropicapi.MessagesRequest{
-			Model:     anthropicapi.Model(req.Model),
-			Messages:  messages,
-			MaxTokens: req.MaxTokens,
-			Stream:    true,
-		},
-	}
-
-	return &chatCompletionStream{
-		ctx:    ctx,
-		client: c.client,
-		req:    streamReq,
-	}, nil
+	return s.stream.Close()
 }
