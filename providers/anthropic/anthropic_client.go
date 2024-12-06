@@ -2,6 +2,7 @@ package anthropic
 
 import (
 	"context"
+	"log/slog"
 	"os"
 
 	"github.com/anthropics/anthropic-sdk-go"
@@ -59,7 +60,7 @@ func (c *Client) ChatCompletion(ctx context.Context, req aisuite.ChatCompletionR
 		Choices: []aisuite.ChatCompletionChoice{
 			{
 				Message: aisuite.ChatCompletionMessage{
-					Role:    aisuite.Role(string(resp.Role)),
+					Role:    fromAnthropicRole(resp.Role),
 					Content: content,
 				},
 			},
@@ -68,10 +69,18 @@ func (c *Client) ChatCompletion(ctx context.Context, req aisuite.ChatCompletionR
 }
 
 func (c *Client) StreamChatCompletion(ctx context.Context, req aisuite.ChatCompletionRequest) (aisuite.ChatCompletionStream, error) {
-	messages := make([]anthropic.MessageParam, len(req.Messages))
-	for i, msg := range req.Messages {
-		if msg.Content != "" {
-			messages[i] = anthropic.NewUserMessage(anthropic.NewTextBlock(msg.Content))
+	system := make([]anthropic.TextBlockParam, 0, 1)
+	messages := make([]anthropic.MessageParam, 0, len(req.Messages))
+	for _, msg := range req.Messages {
+		switch msg.Role {
+		case aisuite.RoleSystem:
+			system = append(system, anthropic.NewTextBlock(msg.Content))
+		case aisuite.RoleUser:
+			messages = append(messages, anthropic.NewUserMessage(anthropic.NewTextBlock(msg.Content)))
+		case aisuite.RoleAssistant:
+			messages = append(messages, anthropic.NewAssistantMessage(anthropic.NewTextBlock(msg.Content)))
+		default:
+			messages = append(messages, anthropic.NewUserMessage(anthropic.NewTextBlock(msg.Content)))
 		}
 	}
 
@@ -82,6 +91,7 @@ func (c *Client) StreamChatCompletion(ctx context.Context, req aisuite.ChatCompl
 
 	stream := c.client.Messages.NewStreaming(ctx, anthropic.MessageNewParams{
 		Model:     anthropic.F(anthropic.Model(req.Model)),
+		System:    anthropic.F(system),
 		Messages:  anthropic.F(messages),
 		MaxTokens: anthropic.F(maxTokens),
 	})
@@ -113,7 +123,7 @@ func (s *chatCompletionStream) Recv() (aisuite.ChatCompletionStreamResponse, err
 				return aisuite.ChatCompletionStreamResponse{
 					Choices: []aisuite.ChatCompletionStreamChoice{
 						{
-							FinishReason: string(event.StopReason),
+							FinishReason: fromAnthropicStopReason(event.StopReason),
 						},
 					},
 				}, nil
@@ -124,7 +134,7 @@ func (s *chatCompletionStream) Recv() (aisuite.ChatCompletionStreamResponse, err
 				Choices: []aisuite.ChatCompletionStreamChoice{
 					{
 						Delta: aisuite.ChatCompletionStreamChoiceDelta{
-							Role:    "assistant",
+							Role:    aisuite.RoleAssistant,
 							Content: delta.Text,
 						},
 					},
@@ -136,4 +146,29 @@ func (s *chatCompletionStream) Recv() (aisuite.ChatCompletionStreamResponse, err
 
 func (s *chatCompletionStream) Close() error {
 	return s.stream.Close()
+}
+
+func fromAnthropicStopReason(stopReason anthropic.MessageDeltaEventDeltaStopReason) aisuite.FinishReason {
+	switch stopReason {
+	case "":
+		return aisuite.FinishReasonNone
+	case "end_turn":
+		return aisuite.FinishReasonStop
+	case "max_tokens":
+		return aisuite.FinishReasonMaxTokens
+	case "content_filter":
+		return aisuite.FinishReasonContentFilter
+	default:
+		return aisuite.FinishReason(string(aisuite.FinishReasonUnknown) + "(" + string(stopReason) + ")")
+	}
+}
+
+func fromAnthropicRole(role anthropic.MessageRole) aisuite.Role {
+	switch role {
+	case anthropic.MessageRoleAssistant:
+		return aisuite.RoleAssistant
+	default:
+		slog.Warn("can't convert anthropic role to aisuite role, should handle this", "role", role)
+		return aisuite.Role(string(role))
+	}
 }

@@ -60,7 +60,7 @@ func main() {
 		Model: "openai:gpt-4o-mini", // or "anthropic:claude-3-5-haiku-20241022"
 		Messages: []aisuite.ChatCompletionMessage{
 			{
-				Role:    aisuite.User,
+				Role:    aisuite.RoleUser,
 				Content: "Hello, how are you?",
 			},
 		},
@@ -72,6 +72,7 @@ func main() {
 
 	fmt.Printf("Response: %s\n", resp.Choices[0].Message.Content)
 }
+
 ```
 
 ### Stream
@@ -101,7 +102,7 @@ func main() {
 		Model: "openai:gpt-4o-mini", // or "anthropic:claude-3-5-haiku-20241022"
 		Messages: []aisuite.ChatCompletionMessage{
 			{
-				Role:    aisuite.User,
+				Role:    aisuite.RoleUser,
 				Content: "Hello, how are you?",
 			},
 		},

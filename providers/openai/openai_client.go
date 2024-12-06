@@ -2,6 +2,7 @@ package openai
 
 import (
 	"context"
+	"log/slog"
 	"os"
 
 	"github.com/cpunion/go-aisuite"
@@ -26,7 +27,7 @@ func (c *Client) ChatCompletion(ctx context.Context, req aisuite.ChatCompletionR
 	aiMessages := make([]ai.ChatCompletionMessage, len(req.Messages))
 	for i, msg := range req.Messages {
 		aiMessages[i] = ai.ChatCompletionMessage{
-			Role:    string(msg.Role),
+			Role:    toOpenAIRole(msg.Role),
 			Content: msg.Content,
 		}
 	}
@@ -44,6 +45,7 @@ func (c *Client) ChatCompletion(ctx context.Context, req aisuite.ChatCompletionR
 	for i, choice := range resp.Choices {
 		choices[i] = aisuite.ChatCompletionChoice{
 			Message: aisuite.ChatCompletionMessage{
+				Role:    fromOpenAIRole(choice.Message.Role),
 				Content: choice.Message.Content,
 			},
 		}
@@ -61,7 +63,12 @@ func (c *chatCompletionStream) Recv() (aisuite.ChatCompletionStreamResponse, err
 		return aisuite.ChatCompletionStreamResponse{}, err
 	}
 	choices := make([]aisuite.ChatCompletionStreamChoice, len(resp.Choices))
+	var role aisuite.Role
 	for i, choice := range resp.Choices {
+		if choice.Delta.Role != "" {
+			// Just use first role, other roles are blank
+			role = fromOpenAIRole(choice.Delta.Role)
+		}
 		var funcCall *aisuite.FunctionCall
 		if choice.Delta.FunctionCall != nil {
 			funcCall = &aisuite.FunctionCall{
@@ -83,12 +90,12 @@ func (c *chatCompletionStream) Recv() (aisuite.ChatCompletionStreamResponse, err
 		choices[i] = aisuite.ChatCompletionStreamChoice{
 			Delta: aisuite.ChatCompletionStreamChoiceDelta{
 				Content:      choice.Delta.Content,
-				Role:         choice.Delta.Role,
+				Role:         role,
 				FunctionCall: funcCall,
 				ToolCalls:    toolCalls,
 				Refusal:      choice.Delta.Refusal,
 			},
-			FinishReason: string(choice.FinishReason),
+			FinishReason: fromOpenAIFinishReason(choice.FinishReason),
 		}
 	}
 	return aisuite.ChatCompletionStreamResponse{Choices: choices}, nil
@@ -102,7 +109,7 @@ func (c *Client) StreamChatCompletion(ctx context.Context, req aisuite.ChatCompl
 	aiMessages := make([]ai.ChatCompletionMessage, len(req.Messages))
 	for i, msg := range req.Messages {
 		aiMessages[i] = ai.ChatCompletionMessage{
-			Role:    string(msg.Role),
+			Role:    toOpenAIRole(msg.Role),
 			Content: msg.Content,
 		}
 	}
@@ -117,4 +124,42 @@ func (c *Client) StreamChatCompletion(ctx context.Context, req aisuite.ChatCompl
 		return nil, err
 	}
 	return &chatCompletionStream{stream: s}, nil
+}
+
+func fromOpenAIFinishReason(reason ai.FinishReason) aisuite.FinishReason {
+	switch reason {
+	case "":
+		return aisuite.FinishReasonNone
+	case ai.FinishReasonStop:
+		return aisuite.FinishReasonStop
+	case ai.FinishReasonLength:
+		return aisuite.FinishReasonMaxTokens
+	}
+	return aisuite.FinishReason("unknown: " + string(reason))
+}
+
+func fromOpenAIRole(role string) aisuite.Role {
+	switch role {
+	case "user":
+		return aisuite.RoleUser
+	case "system":
+		return aisuite.RoleSystem
+	case "assistant":
+		return aisuite.RoleAssistant
+	}
+	slog.Warn("unknown openai role, should handle this", "role", role)
+	return aisuite.Role(string(role))
+}
+
+func toOpenAIRole(role aisuite.Role) string {
+	switch role {
+	case aisuite.RoleUser:
+		return "user"
+	case aisuite.RoleSystem:
+		return "system"
+	case aisuite.RoleAssistant:
+		return "assistant"
+	}
+	slog.Warn("can't convert aisuite role to openai role, should handle this", "role", role)
+	return string(role)
 }

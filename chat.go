@@ -11,14 +11,24 @@ type ToolCall struct {
 	Function FunctionCall
 }
 
+type FinishReason string
+
+const (
+	FinishReasonNone          FinishReason = ""
+	FinishReasonStop          FinishReason = "stop"
+	FinishReasonMaxTokens     FinishReason = "max_tokens"
+	FinishReasonContentFilter FinishReason = "content_filter"
+	FinishReasonUnknown       FinishReason = "unknown"
+)
+
 // ChatCompletionMessage is a message in a chat completion request.
 
 type Role string
 
 const (
-	User      Role = "user"
-	System    Role = "system"
-	Assistant Role = "assistant"
+	RoleUser      Role = "user"
+	RoleSystem    Role = "system"
+	RoleAssistant Role = "assistant"
 )
 
 type ChatCompletionMessage struct {
@@ -45,7 +55,7 @@ type ChatCompletionResponse struct {
 
 type ChatCompletionStreamChoiceDelta struct {
 	Content      string
-	Role         string
+	Role         Role
 	FunctionCall *FunctionCall
 	ToolCalls    []ToolCall
 	Refusal      string
@@ -53,7 +63,7 @@ type ChatCompletionStreamChoiceDelta struct {
 
 type ChatCompletionStreamChoice struct {
 	Delta        ChatCompletionStreamChoiceDelta
-	FinishReason string
+	FinishReason FinishReason
 }
 
 type ChatCompletionStreamResponse struct {
