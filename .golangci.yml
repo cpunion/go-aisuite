@@ -1,0 +1,23 @@
+linters:
+  enable:
+    - gofmt
+    - govet
+    - gosimple
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+    - misspell
+    - goimports
+    - revive
+
+linters-settings:
+  revive:
+    rules:
+      - name: exported
+        severity: warning
+        disabled: false
+
+run:
+  deadline: 5m
+  tests: true
