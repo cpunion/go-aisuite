@@ -1,0 +1,57 @@
+name: Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Test
+    strategy:
+      matrix:
+        go-version: ['1.22']
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ matrix.go-version }}
+        cache: true
+
+    - name: Check Go Formatting
+      run: |
+        if [ "$(gofmt -l . | wc -l)" -gt 0 ]; then
+          echo "The following files are not formatted correctly:"
+          gofmt -l .
+          exit 1
+        fi
+      if: runner.os != 'Windows'
+
+    - name: Install dependencies
+      run: go mod download
+
+    - name: Test examples
+      run: go run ./examples/chat
+      shell: bash
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+    - name: Run tests with coverage
+      run: go test -race -coverprofile=coverage.txt -covermode=atomic ./...
+      shell: bash
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v5
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        fail_ci_if_error: true

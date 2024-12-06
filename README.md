@@ -2,6 +2,16 @@
 
 A cross-platform Go library for interacting with multiple AI providers' APIs, inspired by [aisuite](https://github.com/andrewyng/aisuite). Currently supports OpenAI and Anthropic providers with a unified interface.
 
+
+[![Build Status](https://github.com/cpunion/go-aisuite/actions/workflows/test.yml/badge.svg)](https://github.com/cpunion/go-aisuite/actions/workflows/test.yml)
+[![codecov](https://codecov.io/github/cpunion/go-aisuite/graph/badge.svg?token=uATQa0RzPL)](https://codecov.io/github/cpunion/go-aisuite)
+![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/cpunion/go-aisuite)
+[![GitHub commits](https://badgen.net/github/commits/cpunion/go-aisuite)](https://GitHub.com/Naereen/cpunion/go-aisuite/commit/)
+[![GitHub release](https://img.shields.io/github/v/tag/cpunion/go-aisuite.svg?label=release)](https://github.com/cpunion/go-aisuite/releases)
+[![Go Report Card](https://goreportcard.com/badge/github.com/cpunion/go-aisuite)](https://goreportcard.com/report/github.com/cpunion/go-aisuite)
+[![Go Reference](https://pkg.go.dev/badge/github.com/cpunion/go-aisuite.svg)](https://pkg.go.dev/github.com/cpunion/go-aisuite)
+
+
 ## Features
 
 - Unified interface for multiple AI providers
@@ -40,9 +50,9 @@ func main() {
 	// Initialize client with API keys
 	c := client.New(&client.APIKey{
 		// Set your OpenAI API key or leave empty to use environment variable OPENAI_API_KEY
-		OpenAI: "your-openai-api-key",
+		OpenAI: "",
 		// Set your Anthropic API key or leave empty to use environment variable ANTHROPIC_API_KEY
-		Anthropic: "your-anthropic-api-key",
+		Anthropic: "",
 	})
 
 	// Make a chat completion request
@@ -54,6 +64,7 @@ func main() {
 				Content: "Hello, how are you?",
 			},
 		},
+		MaxTokens: 10,
 	})
 	if err != nil {
 		panic(err)
