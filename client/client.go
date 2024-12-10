@@ -7,8 +7,11 @@ import (
 
 	"github.com/cpunion/go-aisuite"
 	"github.com/cpunion/go-aisuite/providers"
-	_ "github.com/cpunion/go-aisuite/providers/anthropic"
-	_ "github.com/cpunion/go-aisuite/providers/openai"
+	"github.com/cpunion/go-aisuite/providers/anthropic"
+	"github.com/cpunion/go-aisuite/providers/gemini"
+	"github.com/cpunion/go-aisuite/providers/groq"
+	"github.com/cpunion/go-aisuite/providers/openai"
+	"github.com/cpunion/go-aisuite/providers/sambanova"
 )
 
 const (
@@ -18,6 +21,9 @@ const (
 type APIKey struct {
 	OpenAI    string
 	Anthropic string
+	Sambanova string
+	Gemini    string
+	Groq      string
 }
 
 type AdaptiveClient struct {
@@ -52,12 +58,21 @@ func (c AdaptiveClient) getClientAndModel(model string) (aisuite.Client, string)
 	if !ok {
 		panic(fmt.Sprintf("%s: %s", ErrUnknownProvider, providerName))
 	}
-	var apiKey string
+	opts := providers.Options{}
 	switch providerName {
-	case "openai":
-		apiKey = c.apiKey.OpenAI
-	case "anthropic":
-		apiKey = c.apiKey.Anthropic
+	case openai.Name:
+		opts.Token = c.apiKey.OpenAI
+	case anthropic.Name:
+		opts.Token = c.apiKey.Anthropic
+	case gemini.Name:
+		opts.BaseURL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+		opts.Token = c.apiKey.Gemini
+	case sambanova.Name:
+		opts.BaseURL = "https://api.sambanova.ai/v1/"
+		opts.Token = c.apiKey.Sambanova
+	case groq.Name:
+		opts.Token = c.apiKey.Groq
+		opts.BaseURL = "https://api.groq.com/openai/v1/"
 	}
-	return provider.NewClient(apiKey), toks[1]
+	return provider.NewClient(opts), toks[1]
 }

@@ -1,14 +1,15 @@
-package openai
+package sambanova
 
 import (
 	"os"
 
 	"github.com/cpunion/go-aisuite"
 	"github.com/cpunion/go-aisuite/providers"
+	"github.com/cpunion/go-aisuite/providers/openai"
 )
 
-const Name = "openai"
-const apiKeyEnvVar = "OPENAI_API_KEY"
+const Name = "sambanova"
+const apiKeyEnvVar = "SAMBANOVA_API_KEY"
 
 func init() {
 	providers.RegisterProvider(Name, Provider{})
@@ -24,5 +25,5 @@ func (p Provider) NewClient(opts providers.Options) aisuite.Client {
 			panic(apiKeyEnvVar + " not found in environment variables")
 		}
 	}
-	return NewClient(opts)
+	return openai.NewClient(opts)
 }

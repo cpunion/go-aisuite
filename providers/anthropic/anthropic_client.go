@@ -3,12 +3,12 @@ package anthropic
 import (
 	"context"
 	"log/slog"
-	"os"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/anthropics/anthropic-sdk-go/packages/ssestream"
 	"github.com/cpunion/go-aisuite"
+	"github.com/cpunion/go-aisuite/providers"
 )
 
 const (
@@ -19,14 +19,8 @@ type Client struct {
 	client *anthropic.Client
 }
 
-func NewClient(token string) *Client {
-	if token == "" {
-		token = os.Getenv("ANTHROPIC_API_KEY")
-		if token == "" {
-			panic("ANTHROPIC_API_KEY not found in environment variables")
-		}
-	}
-	return &Client{client: anthropic.NewClient(option.WithAPIKey(token))}
+func NewClient(opts providers.Options) *Client {
+	return &Client{client: anthropic.NewClient(option.WithAPIKey(opts.Token))}
 }
 
 func (c *Client) ChatCompletion(ctx context.Context, req aisuite.ChatCompletionRequest) (*aisuite.ChatCompletionResponse, error) {

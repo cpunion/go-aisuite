@@ -18,6 +18,9 @@ A cross-platform Go library for interacting with multiple AI providers' APIs, in
 - Currently supports:
   - OpenAI (via [go-openai](https://github.com/sashabaranov/go-openai))
   - Anthropic (via [official SDK](https://github.com/anthropics/anthropic-sdk-go))
+  - Groq (via OpenAI-compatible API)
+  - Gemini (via OpenAI-compatible API)
+  - SambaNova (via OpenAI-compatible API)
 - Carefully designed API that follows each provider's best practices
 - Gradual and thoughtful addition of necessary interfaces and fields
 
