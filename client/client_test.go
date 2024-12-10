@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +14,9 @@ import (
 var testModels = []string{
 	"openai:gpt-4o-mini",
 	"anthropic:claude-3-5-haiku-20241022",
+	"gemini:gemini-1.5-flash-latest",
+	"sambanova:Meta-Llama-3.2-1B-Instruct",
+	"groq:llama-3.1-8b-instant",
 }
 
 type testCase struct {
@@ -43,7 +47,7 @@ func generateTestCases() []testCase {
 		cases = append(cases, testCase{
 			name:             fmt.Sprintf("%s_normal_stop", strings.Split(model, ":")[1]),
 			model:            model,
-			prompt:           "Hi",
+			prompt:           "Hi (shortly respond)",
 			maxTokens:        20,
 			wantFinishReason: aisuite.FinishReasonStop,
 		})
@@ -75,6 +79,8 @@ func TestChatCompletion(t *testing.T) {
 	models := testModels
 	for _, model := range models {
 		t.Run(model, func(t *testing.T) {
+			wd, _ := os.Getwd()
+			t.Logf("Working directory: %s", wd)
 			withTimeout(t, 10*time.Second, func(ctx context.Context) {
 				resp, err := client.ChatCompletion(ctx, aisuite.ChatCompletionRequest{
 					Model: model,

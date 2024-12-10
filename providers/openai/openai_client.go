@@ -3,9 +3,9 @@ package openai
 import (
 	"context"
 	"log/slog"
-	"os"
 
 	"github.com/cpunion/go-aisuite"
+	"github.com/cpunion/go-aisuite/providers"
 	ai "github.com/sashabaranov/go-openai"
 )
 
@@ -13,14 +13,12 @@ type Client struct {
 	client *ai.Client
 }
 
-func NewClient(token string) *Client {
-	if token == "" {
-		token = os.Getenv("OPENAI_API_KEY")
-		if token == "" {
-			panic("OPENAI_API_KEY not found in environment variables")
-		}
+func NewClient(opts providers.Options) *Client {
+	config := ai.DefaultConfig(opts.Token)
+	if opts.BaseURL != "" {
+		config.BaseURL = opts.BaseURL
 	}
-	return &Client{client: ai.NewClient(token)}
+	return &Client{client: ai.NewClientWithConfig(config)}
 }
 
 func (c *Client) ChatCompletion(ctx context.Context, req aisuite.ChatCompletionRequest) (*aisuite.ChatCompletionResponse, error) {
