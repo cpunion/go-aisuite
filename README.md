@@ -11,7 +11,6 @@ A cross-platform Go library for interacting with multiple AI providers' APIs, in
 [![Go Report Card](https://goreportcard.com/badge/github.com/cpunion/go-aisuite)](https://goreportcard.com/report/github.com/cpunion/go-aisuite)
 [![Go Reference](https://pkg.go.dev/badge/github.com/cpunion/go-aisuite.svg)](https://pkg.go.dev/github.com/cpunion/go-aisuite)
 
-
 ## Features
 
 - Unified interface for multiple AI providers
@@ -50,13 +49,17 @@ import (
 )
 
 func main() {
-	// Initialize client with API keys
-	c := client.New(&client.APIKey{
-		// Set your OpenAI API key or leave empty to use environment variable OPENAI_API_KEY
-		OpenAI: "",
-		// Set your Anthropic API key or leave empty to use environment variable ANTHROPIC_API_KEY
-		Anthropic: "",
-	})
+	// Initialize client with environment variables
+	c := client.New(nil)
+
+	// Or initialize client with API keys
+	// c := client.New(&client.APIKey{
+	// 	OpenAI:    "", // Set your OpenAI API key or keep empty to use OPENAI_API_KEY env
+	// 	Anthropic: "", // Set your Anthropic API key or keep empty to use ANTHROPIC_API_KEY env
+	// 	Groq:      "", // Set your Groq API key or keep empty to use GROQ_API_KEY env
+	// 	Gemini:    "", // Set your Gemini API key or keep empty to use GEMINI_API_KEY env
+	// 	Sambanova: "", // Set your SambaNova API key or keep empty to use SAMBANOVA_API_KEY env
+	// })
 
 	// Make a chat completion request
 	resp, err := c.ChatCompletion(context.Background(), aisuite.ChatCompletionRequest{
@@ -96,8 +99,11 @@ import (
 func main() {
 	// Initialize client with API keys
 	c := client.New(&client.APIKey{
-		OpenAI:    "", // Set your OpenAI API key or use OPENAI_API_KEY env
-		Anthropic: "", // Set your Anthropic API key or use ANTHROPIC_API_KEY env
+		OpenAI:    "", // Set your OpenAI API key or keep empty to use OPENAI_API_KEY env
+		Anthropic: "", // Set your Anthropic API key or keep empty to use ANTHROPIC_API_KEY env
+		Groq:      "", // Set your Groq API key or keep empty to use GROQ_API_KEY env
+		Gemini:    "", // Set your Gemini API key or keep empty to use GEMINI_API_KEY env
+		Sambanova: "", // Set your SambaNova API key or keep empty to use SAMBANOVA_API_KEY env
 	})
 
 	// Create a streaming chat completion request
