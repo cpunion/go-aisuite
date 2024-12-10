@@ -11,8 +11,11 @@ import (
 func main() {
 	// Initialize client with API keys
 	c := client.New(&client.APIKey{
-		OpenAI:    "", // Set your OpenAI API key or use OPENAI_API_KEY env
-		Anthropic: "", // Set your Anthropic API key or use ANTHROPIC_API_KEY env
+		OpenAI:    "", // Set your OpenAI API key or keep empty to use OPENAI_API_KEY env
+		Anthropic: "", // Set your Anthropic API key or keep empty to use ANTHROPIC_API_KEY env
+		Groq:      "", // Set your Groq API key or keep empty to use GROQ_API_KEY env
+		Gemini:    "", // Set your Gemini API key or keep empty to use GEMINI_API_KEY env
+		Sambanova: "", // Set your SambaNova API key or keep empty to use SAMBANOVA_API_KEY env
 	})
 
 	// Create a streaming chat completion request
